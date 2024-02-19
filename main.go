@@ -12,7 +12,7 @@ import (
 
 const (
 	bufReadCount    = 128
-	defaultAlphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя "
+	defaultAlphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ "
 )
 
 type CipherEncoder interface {
@@ -81,18 +81,17 @@ func getNextMessagePart(reader *bufio.Reader) ([]rune, int) {
 	return runes, bytesReadCount
 }
 
-func writeEncodedPart(writer *bufio.Writer, encodedString string) int {
-	bytesWriteCount, err := writer.WriteString(encodedString)
-
+func writeToResult(file *os.File, encodedString string) int {
+	bytesWriteCount, err := fmt.Fprint(file, encodedString)
 	if err != nil {
 		log.Printf("Write encoded part error: %s", err.Error())
 		return bytesWriteCount
 	}
-	_ = writer.Flush()
+
 	return bytesWriteCount
 }
 
-func getKeyWord(sc *bufio.Scanner) []int {
+func getKeyWord(sc *bufio.Scanner) ([]int, string) {
 	sc.Scan()
 	input := sc.Text()
 	keyWords := make([]int, len(input))
@@ -102,7 +101,7 @@ func getKeyWord(sc *bufio.Scanner) []int {
 		keyWords[i] = number
 	}
 
-	return keyWords
+	return keyWords, input
 }
 
 func getAlphabet(sc *bufio.Scanner) (string, bool) {
@@ -118,7 +117,7 @@ func getAlphabet(sc *bufio.Scanner) (string, bool) {
 
 func main() {
 	inputFile, err := os.Open("input.txt")
-	outputFile, err := os.Open("encoded.txt")
+	outputFile, err := os.OpenFile("encoded.txt", os.O_APPEND, 0644)
 	defer func() {
 		err = inputFile.Close()
 		if err != nil {
@@ -136,17 +135,24 @@ func main() {
 	}
 
 	reader := bufio.NewReader(inputFile)
-	writer := bufio.NewWriter(outputFile)
 	scanner := bufio.NewScanner(os.Stdin)
 
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	fmt.Println("Введите ключевое слов: ")
-	keyWord := getKeyWord(scanner)
+	keyWord, keyWordString := getKeyWord(scanner)
 	fmt.Println("Введите алфавит (по надобности): ")
 	alphabet, exists := getAlphabet(scanner)
+
+	writeToResult(outputFile, keyWordString+"\n")
 
 	if !exists {
 		alphabet = defaultAlphabet
 	}
+
+	writeToResult(outputFile, alphabet+"\n")
 
 	encoder := EncoderGronsfeld{keyWord: keyWord}
 	encoder.SetAlphabet(alphabet)
@@ -154,7 +160,7 @@ func main() {
 	input, count := getNextMessagePart(reader)
 	for count > 0 {
 		encoded := encoder.Encode(input)
-		writeEncodedPart(writer, string(encoded))
+		writeToResult(outputFile, string(encoded))
 		input, count = getNextMessagePart(reader)
 	}
 }
