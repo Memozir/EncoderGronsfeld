@@ -9,8 +9,29 @@ import (
 )
 
 func TestEncoding(t *testing.T) {
-	inputFile, err := os.Open("input.txt")
-	outputFile, err := os.OpenFile("encoded.txt", os.O_APPEND, 0644)
+	inputFilePath := "input.txt"
+	outputFilePath := "encoded.txt"
+
+	if _, err := os.Stat(inputFilePath); os.IsNotExist(err) {
+		_, _ = os.Create(inputFilePath)
+	}
+
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		_, err = os.Create(outputFilePath)
+	}
+
+	inputFile, err := os.Open(inputFilePath)
+
+	if err != nil {
+		log.Fatalf("Can`t open file: %s", inputFilePath)
+	}
+
+	outputFile, err := os.OpenFile(outputFilePath, os.O_APPEND|os.O_WRONLY, 0777)
+
+	if err != nil {
+		log.Fatalf("Can`t open file: %s", outputFilePath)
+	}
+
 	defer func() {
 		err = inputFile.Close()
 		if err != nil {
@@ -23,26 +44,17 @@ func TestEncoding(t *testing.T) {
 		}
 	}()
 
-	if err != nil {
-		log.Fatal("Can`t open file")
-	}
-
 	reader := bufio.NewReader(inputFile)
 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	fmt.Println("Введите ключевое слов: ")
-	keyWord, keyWordString := []int{1, 2, 3}, "123"
-	fmt.Println("Введите алфавит (по надобности): ")
-	alphabet, exists := "", false
+	keyWord, keyWordString := []int{1, 2, 3, 4, 6}, "123456"
 
 	writeToResult(outputFile, keyWordString+"\n")
 
-	if !exists {
-		alphabet = defaultAlphabet
-	}
+	alphabet := defaultAlphabet
 
 	writeToResult(outputFile, alphabet+"\n")
 
