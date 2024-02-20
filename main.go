@@ -115,8 +115,29 @@ func getAlphabet(sc *bufio.Scanner) (string, bool) {
 }
 
 func main() {
-	inputFile, err := os.Open("input.txt")
-	outputFile, err := os.OpenFile("encoded.txt", os.O_APPEND, 0644)
+	inputFilePath := "input.txt"
+	outputFilePath := "encoded.txt"
+
+	if _, err := os.Stat(inputFilePath); os.IsNotExist(err) {
+		_, _ = os.Create(inputFilePath)
+	}
+
+	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
+		_, err = os.Create(outputFilePath)
+	}
+
+	inputFile, err := os.Open(inputFilePath)
+
+	if err != nil {
+		log.Fatalf("Can`t open file: %s", inputFilePath)
+	}
+
+	outputFile, err := os.OpenFile(outputFilePath, os.O_APPEND|os.O_WRONLY, 0777)
+
+	if err != nil {
+		log.Fatalf("Can`t open file: %s", outputFilePath)
+	}
+
 	defer func() {
 		err = inputFile.Close()
 		if err != nil {
@@ -128,10 +149,6 @@ func main() {
 			log.Fatalf("File close error: %s", err)
 		}
 	}()
-
-	if err != nil {
-		log.Fatal("Can`t open file")
-	}
 
 	reader := bufio.NewReader(inputFile)
 	scanner := bufio.NewScanner(os.Stdin)
