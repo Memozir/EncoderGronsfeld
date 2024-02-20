@@ -33,7 +33,6 @@ func (encoder *EncoderGronsfeld) SetAlphabet(alphabet string) {
 }
 
 func (encoder *EncoderGronsfeld) Encode(toEncode []rune) []rune {
-	//encoded := make([]rune, len(toEncode))
 	keyWordCount := 0
 
 	for position, symbol := range toEncode {
