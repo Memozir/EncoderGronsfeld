@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -36,7 +37,6 @@ func (encoder *EncoderGronsfeld) Encode(toEncode []rune) []rune {
 	keyWordCount := 0
 
 	for position, symbol := range toEncode {
-
 		if keyWordCount == len(encoder.keyWord) {
 			keyWordCount = 0
 		}
@@ -74,6 +74,10 @@ func getNextMessagePart(reader *bufio.Reader) ([]rune, int) {
 
 	buf := make([]byte, bufReadCount)
 	bytesReadCount, _ := reader.Read(buf)
+	tempString := string(buf)
+	tempString = strings.Replace(tempString, "\r", "", -1)
+	tempString = strings.Trim(tempString, string(utf8.RuneError))
+	buf = []byte(tempString)
 	buf = bytes.Trim(buf, "\x00")
 	runes := bytes.Runes(buf)
 
@@ -177,6 +181,7 @@ func main() {
 	for count > 0 {
 		encoded := encoder.Encode(input)
 		writeToResult(outputFile, string(encoded))
+		// fmt.Print(string(encoded))
 		input, count = getNextMessagePart(reader)
 	}
 }
