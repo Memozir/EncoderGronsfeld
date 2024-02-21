@@ -46,18 +46,16 @@ func TestEncoding(t *testing.T) {
 
 	reader := bufio.NewReader(inputFile)
 	// writer := bufio.NewWriter(outputFile)
-	// scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(os.Stdin)
 
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
 	fmt.Println("Введите ключевое слов: ")
-	// keyWord, keyWordString := getKeyWord(scanner)
-	keyWord, keyWordString := []int{1}, "1"
+	keyWord, keyWordString := getKeyWord(scanner)
 	fmt.Println("Введите алфавит (по надобности): ")
-	// alphabet, exists := getAlphabet(scanner)
-	alphabet, exists := defaultAlphabet, true
+	alphabet, exists := getAlphabet(scanner)
 
 	writeToResult(outputFile, keyWordString+"\n")
 
@@ -75,7 +73,6 @@ func TestEncoding(t *testing.T) {
 		encoded := encoder.Encode(input)
 		fmt.Println(encoded)
 		writeToResult(outputFile, string(encoded))
-		// fmt.Print(string(encoded))
 		input, count = getNextMessagePart(reader)
 	}
 }
