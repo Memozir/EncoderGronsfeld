@@ -2,30 +2,31 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
 const (
 	bufReadCount    = 128
 	defaultAlphabet = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ "
+	fileInputPath   = "input1.txt"
+	fileOutputPath  = "encoded.txt"
 )
 
 type CipherEncoder interface {
 	Encode([]rune) []rune
 }
 
-type EncoderGronsfeld struct {
+type GronsfeldEncoder struct {
 	alphabet map[rune]int
 	keyWord  []int
 }
 
-func (encoder *EncoderGronsfeld) SetAlphabet(alphabet string) {
+func (encoder *GronsfeldEncoder) SetAlphabet(alphabet string) {
 	encoder.alphabet = make(map[rune]int)
 	runes := []rune(alphabet)
 	for i, symbol := range runes {
@@ -33,7 +34,7 @@ func (encoder *EncoderGronsfeld) SetAlphabet(alphabet string) {
 	}
 }
 
-func (encoder *EncoderGronsfeld) Encode(toEncode []rune) []rune {
+func (encoder *GronsfeldEncoder) Encode(toEncode []rune) []rune {
 	keyWordCount := 0
 
 	for position, symbol := range toEncode {
@@ -68,20 +69,49 @@ func (encoder *EncoderGronsfeld) Encode(toEncode []rune) []rune {
 	return toEncode
 }
 
-func getNextMessagePart(reader *bufio.Reader) ([]rune, int) {
+func NewGronsfeldEncoder(keyword []int, alphabet string) *GronsfeldEncoder {
+	encoder := &GronsfeldEncoder{keyWord: keyword}
+	encoder.SetAlphabet(alphabet)
+	return encoder
+}
+
+func getNextMessagePart(reader *bufio.Reader) ([]rune, int, error) {
 	// `vsem privet, sevodnya ya nachinau svoi videoblog, znau tak ne interesno, y menya och vazhnaya informaciya!
 	// Dorogoy dnevnic! Mne ne peredat slovami vse cho ya isputala v dannuyu secundu. Yuri ahuel nu vot chestnoe slovo`
 
-	buf := make([]byte, bufReadCount)
-	bytesReadCount, _ := reader.Read(buf)
-	tempString := string(buf)
-	tempString = strings.Replace(tempString, "\r", "", -1)
-	tempString = strings.Trim(tempString, string(utf8.RuneError))
-	buf = []byte(tempString)
-	buf = bytes.Trim(buf, "\x00")
-	runes := bytes.Runes(buf)
+	buf := make([]rune, bufReadCount)
+	//bytesReadCount, err := reader.Read(buf)
 
-	return runes, bytesReadCount
+	var readedRune rune
+	var size int
+	var err error
+
+	for i := 0; i < bufReadCount; i++ {
+		readedRune, size, err = reader.ReadRune()
+		if err == io.EOF {
+			buf = buf[:i]
+			return buf, len(buf), err
+		} else if err != nil {
+			return nil, size, err
+		}
+
+		buf[i] = readedRune
+	}
+
+	//if err != nil {
+	//	fmt.Println(err.Error())
+	//}
+
+	//tempString := string(buf)
+	//fmt.Println(tempString)
+	//tempString = strings.Replace(tempString, "\r", "", -1)
+	//tempString = strings.Replace(tempString, "\r", "", -1)
+	////tempString = strings.Trim(tempString, string(utf8.RuneError))
+	//buf = []byte(tempString)
+	//buf = bytes.Trim(buf, "\x00")
+	//runes := bytes.Runes(buf)
+
+	return buf, size, err
 }
 
 func writeToResult(file *os.File, encodedString string) int {
@@ -95,6 +125,7 @@ func writeToResult(file *os.File, encodedString string) int {
 }
 
 func getKeyWord(sc *bufio.Scanner) ([]int, string) {
+	fmt.Println("Введите ключевое слов: ")
 	sc.Scan()
 	input := sc.Text()
 	keyWords := make([]int, len(input))
@@ -108,6 +139,7 @@ func getKeyWord(sc *bufio.Scanner) ([]int, string) {
 }
 
 func getAlphabet(sc *bufio.Scanner) (string, bool) {
+	fmt.Println("Введите алфавит (по надобности): ")
 	sc.Scan()
 	alphabet := sc.Text()
 
@@ -118,70 +150,75 @@ func getAlphabet(sc *bufio.Scanner) (string, bool) {
 	return alphabet, true
 }
 
+func GetInputFileReader(filePath string) *bufio.Reader {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		_, _ = os.Create(filePath)
+	}
+
+	inputFile, err := os.Open(filePath)
+
+	if err != nil {
+		log.Fatalf("Can`t open file: %s", filePath)
+	}
+
+	reader := bufio.NewReader(inputFile)
+
+	return reader
+}
+
+func GetOutputFileWriter(filePath string) *os.File {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		_, err = os.Create(filePath)
+	}
+
+	outputFile, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0777)
+
+	if err != nil {
+		log.Fatalf("Can`t open file: %s", filePath)
+	}
+
+	return outputFile
+}
+
+func startEncoding(encoder CipherEncoder, reader *bufio.Reader, writer *os.File) {
+	input, count, err := getNextMessagePart(reader)
+	for count > 0 {
+		if err == io.EOF {
+			encoded := encoder.Encode(input)
+			writeToResult(writer, string(encoded))
+			break
+		} else if err != nil {
+			break
+		}
+		encoded := encoder.Encode(input)
+		writeToResult(writer, string(encoded))
+		input, count, err = getNextMessagePart(reader)
+	}
+}
+
 func main() {
-	inputFilePath := "input.txt"
-	outputFilePath := "encoded.txt"
-
-	if _, err := os.Stat(inputFilePath); os.IsNotExist(err) {
-		_, _ = os.Create(inputFilePath)
-	}
-
-	if _, err := os.Stat(outputFilePath); os.IsNotExist(err) {
-		_, err = os.Create(outputFilePath)
-	}
-
-	inputFile, err := os.Open(inputFilePath)
-
-	if err != nil {
-		log.Fatalf("Can`t open file: %s", inputFilePath)
-	}
-
-	outputFile, err := os.OpenFile(outputFilePath, os.O_APPEND|os.O_WRONLY, 0777)
-
-	if err != nil {
-		log.Fatalf("Can`t open file: %s", outputFilePath)
-	}
+	fileInputReader := GetInputFileReader(fileInputPath)
+	fileOutputWriter := GetOutputFileWriter(fileOutputPath)
 
 	defer func() {
-		err = inputFile.Close()
-		if err != nil {
-			log.Fatalf("File close error: %s", err)
-		}
+		err := fileOutputWriter.Close()
 
-		err = outputFile.Close()
 		if err != nil {
-			log.Fatalf("File close error: %s", err)
+			log.Printf("File <%s> close error: %s", fileOutputPath, err.Error())
 		}
 	}()
 
-	reader := bufio.NewReader(inputFile)
 	scanner := bufio.NewScanner(os.Stdin)
 
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
-	fmt.Println("Введите ключевое слов: ")
 	keyWord, keyWordString := getKeyWord(scanner)
-	fmt.Println("Введите алфавит (по надобности): ")
 	alphabet, exists := getAlphabet(scanner)
-
-	writeToResult(outputFile, keyWordString+"\n")
 
 	if !exists {
 		alphabet = defaultAlphabet
 	}
 
-	writeToResult(outputFile, alphabet+"\n")
-
-	encoder := EncoderGronsfeld{keyWord: keyWord}
-	encoder.SetAlphabet(alphabet)
-
-	input, count := getNextMessagePart(reader)
-	for count > 0 {
-		encoded := encoder.Encode(input)
-		writeToResult(outputFile, string(encoded))
-		// fmt.Print(string(encoded))
-		input, count = getNextMessagePart(reader)
-	}
+	writeToResult(fileOutputWriter, keyWordString+"\n")
+	writeToResult(fileOutputWriter, alphabet+"\n")
+	encoder := NewGronsfeldEncoder(keyWord, alphabet)
+	startEncoding(encoder, fileInputReader, fileOutputWriter)
 }
